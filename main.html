@@ -128,7 +128,7 @@
     const animalMarkers = {};
     for (const [name, coords] of Object.entries(animals)) {
       const marker = L.marker(coords).addTo(map)
-        .bindPopup(<b>${name}</b><br><button onclick=\"handleAnimalClick('${name}')\">Get Directions</button>);
+        .bindPopup(`<b>${name}</b><br><button onclick=\"handleAnimalClick('${name}')\">Get Directions</button>`);
 
       const label = L.marker(coords, {
         icon: L.divIcon({
@@ -168,7 +168,7 @@
         iconAnchor: [12, 41],
         popupAnchor: [0, -30]
       })
-    }).addTo(map).bindPopup(You are here (Accuracy: ${Math.round(accuracy)}m)).openPopup();
+    }).addTo(map).bindPopup(`You are here (Accuracy: ${Math.round(accuracy)}m)`).openPopup();
   }
 
   // Draw or update accuracy circle
