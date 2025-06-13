@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Katraj Zoo Live Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body { background: #f0f4f7; }
+    #map { height: 100vh; width: 100vw; }
+    .leaflet-control-zoom { display: none !important; }
+    .animal-label {
+      font-weight: 600;
+      background: transparent;
+      padding: 0;
+      border: none;
+      font-size: 14px;
+      color: #000;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+    }
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .controls label {
+      font-weight: bold;
+    }
+    .controls select, .controls button {
+      padding: 6px 10px;
+      margin-top: 8px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    .controls button {
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    .controls button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <label for="animalSelect">Go to Animal:</label><br>
+    <select id="animalSelect">
+      <option value="">--Select--</option>
+    </select>
+    <button onclick="goToAnimal()">Go</button>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const map = L.map('map', { zoomControl: false }).setView([18.4515, 73.8655], 17);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 20,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const zooPath = [
+      [18.454386, 73.859095], [18.454276, 73.859579], [18.454055, 73.859655],
+      [18.453843, 73.859664], [18.453543, 73.859607], [18.453339, 73.859525],
+      [18.453023, 73.85938], [18.452695, 73.859206], [18.452376, 73.859028],
+      [18.45219, 73.858932], [18.451855, 73.858891], [18.451483, 73.858866],
+      [18.451113, 73.858841], [18.450832, 73.858838], [18.450676, 73.858851],
+      [18.450386, 73.859133], [18.450218, 73.859354], [18.450074, 73.859539],
+      [18.450003, 73.859626], [18.449862, 73.859722], [18.449677, 73.859855],
+      [18.449401, 73.860057], [18.449235, 73.859921], [18.449091, 73.859795],
+      [18.449027, 73.860015], [18.449018, 73.860262], [18.449074, 73.860574],
+      [18.449171, 73.861017], [18.449303, 73.861554], [18.449514, 73.862166],
+      [18.449921, 73.862192], [18.450234, 73.862203], [18.450573, 73.862244],
+      [18.450919, 73.86229], [18.451312, 73.862371], [18.451807, 73.862486],
+      [18.452246, 73.862648], [18.452436, 73.862741], [18.452697, 73.862968],
+      [18.453039, 73.863168], [18.453322, 73.863243], [18.453622, 73.863195]
+    ];
+
+    const pathPolyline = L.polyline(zooPath, {
+      color: 'green',
+      weight: 5,
+      opacity: 0.7
+    }).addTo(map);
+
+    const animals = {
+      "Antilog": [18.4513869, 73.8623289],
+      "Deer": [18.4491094, 73.8603943],
+      "Elephant": [18.4538641, 73.8632311],
+      "Jungle cat": [18.4532853, 73.8592849],
+      "Leopard": [18.4501952, 73.8587092],
+      "Lion": [18.4544518, 73.8637011],
+      "Monitor lizard": [18.4553518, 73.8597845],
+      "Monkey": [18.4546258, 73.859537],
+      "Peacock": [18.4550907, 73.8606874],
+      "Python": [18.4557459, 73.8593885],
+      "Sloth bear": [18.4509190, 73.8586884],
+      "Snakes": [18.4552803, 73.8595568],
+      "Tiger": [18.4497883, 73.8591234],
+      "White Tiger": [18.4490385, 73.8598069]
+    };
+
+    const animalSelect = document.getElementById("animalSelect");
+    Object.keys(animals).sort().forEach(animal => {
+      const option = document.createElement("option");
+      option.value = animal;
+      option.textContent = animal;
+      animalSelect.appendChild(option);
+    });
+
+    const animalMarkers = {};
+    for (const [name, coords] of Object.entries(animals)) {
+      const marker = L.marker(coords).addTo(map)
+        .bindPopup(<b>${name}</b><br><button onclick=\"handleAnimalClick('${name}')\">Get Directions</button>);
+
+      const label = L.marker(coords, {
+        icon: L.divIcon({
+          className: 'animal-label',
+          html: name,
+          iconAnchor: [30, -10]
+        }),
+        interactive: false
+      }).addTo(map);
+
+      animalMarkers[name] = marker;
+    }
+
+    let userMarker = null;
+    let userCoords = null;
+    let routingControl = null;
+    let currentAnimal = null;
+
+    function showUserLocation(latlng, accuracy) {
+  console.log("User location received:", latlng, "Accuracy:", accuracy);
+
+  if (accuracy > 100) {
+    alert("Your location accuracy is too low (>100m). Try moving to an open area or check GPS settings.");
+    return;
+  }
+
+  userCoords = latlng;
+
+  // Update or create user marker
+  if (userMarker) {
+    userMarker.setLatLng(latlng);
+  } else {
+    userMarker = L.marker(latlng, {
+      icon: L.icon({
+        iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [0, -30]
+      })
+    }).addTo(map).bindPopup(You are here (Accuracy: ${Math.round(accuracy)}m)).openPopup();
+  }
+
+  // Draw or update accuracy circle
+  if (window.userAccuracyCircle) {
+    userAccuracyCircle.setLatLng(latlng).setRadius(accuracy);
+  } else {
+    window.userAccuracyCircle = L.circle(latlng, {
+      radius: accuracy,
+      color: 'blue',
+      fillColor: '#cce5ff',
+      fillOpacity: 0.2
+    }).addTo(map);
+  }
+
+  if (currentAnimal) getShortestPath(currentAnimal);
+}
+
+
+    function startLiveLocationTracking() {
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+          (position) => {
+            showUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            }, position.coords.accuracy);
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+            alert("Unable to retrieve your location. Please allow location access.");
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000
+          }
+        );
+      } else {
+        alert("Geolocation is not supported by your browser.");
+      }
+    }
+
+    startLiveLocationTracking();
+
+    function getShortestPath(destination) {
+      currentAnimal = destination;
+      if (!userCoords) {
+        alert("User location not available yet.");
+        return;
+      }
+
+      if (routingControl) {
+        map.removeControl(routingControl);
+      }
+
+      routingControl = L.Routing.control({
+        waypoints: [
+          L.latLng(userCoords.lat, userCoords.lng),
+          L.latLng(...animals[destination])
+        ],
+        router: L.Routing.osrmv1({ profile: 'foot' }),
+        routeWhileDragging: false,
+        show: false,
+        addWaypoints: false,
+        lineOptions: {
+          styles: [{ color: '#007bff', opacity: 0.8, weight: 5 }]
+        },
+        createMarker: () => null
+      }).addTo(map);
+    }
+
+    function goToAnimal() {
+      const selected = document.getElementById('animalSelect').value;
+      if (selected && animals[selected]) {
+        map.setView(animals[selected], 18);
+        getShortestPath(selected);
+      }
+    }
+
+    function handleAnimalClick(animalName) {
+      document.getElementById("animalSelect").value = animalName;
+      goToAnimal();
+    }
+  </script>
+</body>
+</html>

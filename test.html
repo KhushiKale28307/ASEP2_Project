@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Katraj Zoo Live Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body { background: #f0f4f7; }
+    #map { height: 100vh; width: 100vw; }
+    .leaflet-control-zoom { display: none !important; }
+    .animal-label {
+      font-weight: 600;
+      background: transparent;
+      padding: 0;
+      border: none;
+      font-size: 14px;
+      color: #000;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+    }
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .controls label {
+      font-weight: bold;
+    }
+    .controls select, .controls button {
+      padding: 6px 10px;
+      margin-top: 8px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    .controls button {
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    .controls button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <label for="animalSelect">Go to Animal:</label><br>
+    <select id="animalSelect">
+      <option value="">--Select--</option>
+    </select>
+    <button onclick="goToAnimal()">Go</button>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const map = L.map('map', { zoomControl: false }).setView([18.4515, 73.8655], 17);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 20,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const animals = {
+      "Antilog": [18.4513869, 73.8623289],
+      "Deer": [18.4491094, 73.8603943],
+      "Elephant": [18.4538641, 73.8632311],
+      "Jungle cat": [18.4532853, 73.8592849],
+      "Leopard": [18.4501952, 73.8587092],
+      "Lion": [18.4544518, 73.8637011],
+      "Monitor lizard": [18.4553518, 73.8597845],
+      "Monkey": [18.4546258, 73.859537],
+      "Peacock": [18.4550907, 73.8606874],
+      "Python": [18.4557459, 73.8593885],
+      "Sloth bear": [18.4509190, 73.8586884],
+      "Snakes": [18.4552803, 73.8595568],
+      "Tiger": [18.4497883, 73.8591234],
+      "White Tiger": [18.4490385, 73.8598069],
+      // Adding Zoo Entry as a known location
+      "Zoo Entry": [18.4543068, 73.8588943]
+    };
+
+    // Populate dropdown alphabetically
+    const animalSelect = document.getElementById("animalSelect");
+    Object.keys(animals).sort().forEach(animal => {
+      const option = document.createElement("option");
+      option.value = animal;
+      option.textContent = animal;
+      animalSelect.appendChild(option);
+    });
+
+    const animalMarkers = {};
+    for (const [name, coords] of Object.entries(animals)) {
+      const marker = L.marker(coords).addTo(map)
+        .bindPopup(`<b>${name}</b><br><button onclick="handleAnimalClick('${name}')">Get Directions</button>`);
+
+      const label = L.marker(coords, {
+        icon: L.divIcon({
+          className: 'animal-label',
+          html: name,
+          iconAnchor: [30, -10]
+        }),
+        interactive: false
+      }).addTo(map);
+
+      animalMarkers[name] = marker;
+    }
+
+    let userMarker = null;
+    let userCoords = null;
+
+    function showUserLocation(latlng) {
+      userCoords = latlng;
+      if (userMarker) {
+        userMarker.setLatLng(latlng);
+      } else {
+        userMarker = L.marker(latlng, {
+          icon: L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png', // User location icon
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [0, -30]
+          })
+        }).addTo(map).bindPopup("You are here (Zoo Entry)").openPopup();
+        map.setView(latlng, 17);
+      }
+    }
+
+    // Hardcode user location to Zoo Entry for testing
+    const zooEntryCoords = {
+      lat: 18.4543068,
+      lng: 73.8588943
+    };
+    showUserLocation(zooEntryCoords);
+
+
+    async function getShortestPath(destination) {
+      if (!userCoords) {
+        alert("Your location is not set. Cannot get directions.");
+        return;
+      }
+
+      // Instead of "User", we'll send the actual coordinates or a known label like "Zoo Entry"
+      // It's better to send coordinates for more flexible pathfinding on the backend
+      const startPoint = "Zoo Entry"; // Or use userCoords directly: { lat: userCoords.lat, lng: userCoords.lng }
+
+      try {
+        const response = await fetch('http://localhost:5000/shortest-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ start: startPoint, end: destination })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        alert(`Shortest path:\n${result.path.join(" → ")}\nDistance: ${result.distance} m`);
+      } catch (error) {
+        console.error("Error fetching shortest path:", error);
+        alert("Failed to get shortest path. Make sure your backend server is running and accessible.");
+      }
+    }
+
+    function goToAnimal() {
+      const selected = document.getElementById('animalSelect').value;
+      if (selected && animals[selected]) {
+        map.setView(animals[selected], 18);
+        getShortestPath(selected);
+      }
+    }
+
+    function handleAnimalClick(animalName) {
+      document.getElementById("animalSelect").value = animalName;
+      goToAnimal();
+    }
+  </script>
+</body>
+</html>
